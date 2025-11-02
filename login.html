@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login | CLChat 💫</title>
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(40,40,40,0.8));
+  color: #fff;
+}
+.hidden { display: none; }
+
+#auth-box {
+  width: 320px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 30px;
+  text-align: center;
+}
+h2 { color: gold; }
+
+input, select {
+  width: 90%;
+  padding: 10px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffd700, #ffb700);
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+}
+#switch-auth {
+  color: #ffd700;
+  text-decoration: underline;
+  cursor: pointer;
+  display: block;
+  margin-top: 10px;
+}
+</style>
+</head>
+<body>
+
+<div id="auth-box">
+  <h2>CLChat 💫</h2>
+
+  <!-- LOGIN FORM -->
+  <form id="login-form">
+    <input type="text" id="login-phone" placeholder="Phone number" required><br>
+    <input type="password" id="login-password" placeholder="Password" required><br>
+    <button type="submit">Login</button>
+    <span id="switch-auth">Create account</span>
+  </form>
+
+  <!-- SIGNUP FORM -->
+  <form id="signup-form" class="hidden">
+    <input type="text" id="first-name" placeholder="First name" required><br>
+    <input type="text" id="last-name" placeholder="Last name" required><br>
+    <select id="gender" required>
+      <option value="">Select gender</option>
+      <option>Male</option>
+      <option>Female</option>
+    </select><br>
+    <input type="text" id="signup-phone" placeholder="Phone number" required><br>
+    <input type="password" id="signup-password" placeholder="Password" required><br>
+    <button type="submit">Create Account</button>
+    <span id="switch-login" style="color:#ffd700;text-decoration:underline;cursor:pointer;display:block;margin-top:10px;">Back to login</span>
+  </form>
+</div>
+
+<script>
+const BACKEND_URL = 'https://chat-1-zkny.onrender.com';
+
+const loginForm = document.getElementById("login-form");
+const signupForm = document.getElementById("signup-form");
+const switchAuth = document.getElementById("switch-auth");
+const switchLogin = document.getElementById("switch-login");
+
+// Switch between forms
+switchAuth.onclick = () => { loginForm.classList.add("hidden"); signupForm.classList.remove("hidden"); };
+switchLogin.onclick = () => { signupForm.classList.add("hidden"); loginForm.classList.remove("hidden"); };
+
+// LOGIN
+loginForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const phone = document.getElementById("login-phone").value;
+  const password = document.getElementById("login-password").value;
+
+  const res = await fetch(`${BACKEND_URL}/api/login`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ phone, password })
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    localStorage.setItem("username", data.name || phone);
+    window.location.href = "chat.html"; // redirect to chat page
+  } else {
+    alert("Invalid phone number or password.");
+  }
+});
+
+// SIGNUP
+signupForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const user = {
+    firstName: document.getElementById("first-name").value,
+    lastName: document.getElementById("last-name").value,
+    gender: document.getElementById("gender").value,
+    phone: document.getElementById("signup-phone").value,
+    password: document.getElementById("signup-password").value
+  };
+
+  const res = await fetch(`${BACKEND_URL}/api/register`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(user)
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    localStorage.setItem("username", `${user.firstName} ${user.lastName}`);
+    window.location.href = "chat.html"; // redirect to chat page
+  } else {
+    alert("Signup failed. Try again.");
+  }
+});
+</script>
+</body>
+</html>
