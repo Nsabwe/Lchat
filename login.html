@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login | LCChat 💫</title>
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #111, #222);
+  color: #fff;
+  overflow: hidden;
+}
+
+#auth-container {
+  width: 350px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  position: relative;
+}
+
+#moving-banner {
+  position: absolute;
+  top: 10px;
+  width: max-content;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: bold;
+  color: gold;
+  animation: slide-left 15s linear infinite;
+}
+
+@keyframes slide-left {
+  0% { left: 100%; }
+  100% { left: -100%; }
+}
+
+h2 {
+  color: gold;
+  margin-bottom: 20px;
+}
+
+input, select {
+  width: 90%;
+  padding: 10px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffd700, #ffb700);
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+#switch-auth, #switch-login {
+  color: #ffd700;
+  text-decoration: underline;
+  cursor: pointer;
+  display: block;
+  margin-top: 12px;
+}
+
+.hidden { display: none; }
+
+#welcome-message {
+  color: #ffd700;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+</style>
+</head>
+<body>
+
+<div id="auth-container">
+  <div id="moving-banner">Muli olandiridwa ndi kuloledwa kugwiritsa ntchito LCchat pokhapokha ngati mwatsatira ndandanda wa mafuso  mwafusidwa musiwa</div>
+
+  <div id="welcome-message" class="hidden"></div>
+
+  <!-- LOGIN FORM -->
+  <form id="login-form">
+    <h2>Login</h2>
+    <input type="text" id="login-phone" placeholder="Phone number" required><br>
+    <input type="password" id="login-password" placeholder="Password" required><br>
+    <button type="submit">Login</button>
+    <span id="switch-auth">Create account</span>
+  </form>
+
+  <!-- SIGNUP FORM -->
+  <form id="signup-form" class="hidden">
+    <h2>Create Account</h2>
+    <input type="text" id="first-name" placeholder="First name" required><br>
+    <input type="text" id="last-name" placeholder="Last name" required><br>
+    <select id="gender" required>
+      <option value="">Select gender</option>
+      <option>Male</option>
+      <option>Female</option>
+    </select><br>
+    <input type="text" id="signup-phone" placeholder="Phone number" required><br>
+    <input type="password" id="signup-password" placeholder="Password" required><br>
+    <button type="submit">Create Account</button>
+    <span id="switch-login">Back to login</span>
+  </form>
+</div>
+
+<script>
+const BACKEND_URL = 'https://chat-2-7yia.onrender.com'; // replace with your backend
+
+const loginForm = document.getElementById("login-form");
+const signupForm = document.getElementById("signup-form");
+const switchAuth = document.getElementById("switch-auth");
+const switchLogin = document.getElementById("switch-login");
+const welcomeMessage = document.getElementById("welcome-message");
+
+// Switch between forms
+switchAuth.onclick = () => {
+  loginForm.classList.add("hidden");
+  signupForm.classList.remove("hidden");
+  welcomeMessage.classList.add("hidden");
+};
+switchLogin.onclick = () => {
+  signupForm.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+  welcomeMessage.classList.add("hidden");
+};
+
+// LOGIN
+loginForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const phone = document.getElementById("login-phone").value;
+  const password = document.getElementById("login-password").value;
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/login`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ phone, password })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem("username", data.name || phone);
+      alert(`Welcome back, ${data.name || phone}!`);
+      window.location.href = "chat.html";
+    } else {
+      alert("Invalid phone number or password. If forgotten, create a new account.");
+    }
+  } catch (err) {
+    alert("Error connecting to server.");
+  }
+});
+
+// SIGNUP
+signupForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const user = {
+    firstName: document.getElementById("first-name").value,
+    lastName: document.getElementById("last-name").value,
+    gender: document.getElementById("gender").value,
+    phone: document.getElementById("signup-phone").value,
+    password: document.getElementById("signup-password").value
+  };
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/register`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(user)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem("username", `${user.firstName} ${user.lastName}`);
+      // Show welcome message before redirect
+      signupForm.classList.add("hidden");
+      welcomeMessage.textContent = `Welcome, ${user.firstName} ${user.lastName}! Redirecting to chat...`;
+      welcomeMessage.classList.remove("hidden");
+      setTimeout(() => window.location.href = "chat.html", 2000);
+    } else {
+      alert("Signup failed. Try again.");
+    }
+  } catch (err) {
+    alert("Error connecting to server.");
+  }
+});
+</script>
+</body>
+</html>
