@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Advanced Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+/* your existing CSS remains unchanged */
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+body{background:#f0f2f5;height:100vh}
+/* ...rest of your CSS unchanged... */
+</style>
+</head>
+
+<body>
+
+<div class="top-bar">
+    Chat App
+    <i class="fa-solid fa-user" onclick="profileModal.style.display='flex'"></i>
+</div>
+
+<div id="chatHeader">
+    <div id="onlineCount">0 Online</div>
+    <div id="typingStatus"></div>
+    <small id="lastSeenText" style="color:gray"></small>
+</div>
+
+<div class="content-area" id="contentArea"></div>
+
+<div class="bottom-bar">
+    <div class="input-container">
+        <textarea id="messageInput" placeholder="Type a message..."></textarea>
+        <button class="send-btn" id="sendBtn"><i class="fa fa-paper-plane"></i></button>
+    </div>
+    <div class="bottom-buttons">
+        <button onclick="openFilePicker()"><i class="fa fa-paperclip"></i></button>
+        <button onmousedown="startRecording()" onmouseup="stopRecording()">
+            <i class="fa fa-microphone"></i>
+        </button>
+    </div>
+</div>
+
+<input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx" hidden>
+
+<!-- PROFILE MODAL -->
+<div id="profileModal" class="modal">
+    <div class="modal-content">
+        <h3>Set Profile</h3>
+        <input id="userNameInput" placeholder="Name"><br><br>
+        <input type="file" id="profileFileInput" accept="image/*"><br><br>
+        <button onclick="saveProfile()">Save</button>
+        <button class="close-btn" onclick="profileModal.style.display='none'">X</button>
+    </div>
+</div>
+
+<!-- IMAGE MODAL -->
+<div id="imageModal" class="modal">
+    <div class="modal-content">
+        <img id="modalImage" style="width:100%">
+        <button class="close-btn" onclick="imageModal.style.display='none'">X</button>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+// 🔹 Define backend URI in one place
+const BASE_URI = "https://clchat3-6q3a.onrender.com";
+
+const socket = io(BASE_URI);
+let currentUser={}, typingTimer;
+let mediaRecorder,audioChunks=[];
+
+/* UTIL */
+function toBase64(file){
+    return new Promise(r=>{
+        const fr=new FileReader();fr.onload=()=>r(fr.result);
+        fr.readAsDataURL(file);
+    });
+}
+
+/* PROFILE */
+async function saveProfile(){
+    const name=userNameInput.value;
+    const file=profileFileInput.files[0];
+    if(!name||!file)return alert("Missing");
+    currentUser={name,profile:await toBase64(file)};
+    socket.emit("join",currentUser);
+    profileModal.style.display='none';
+    loadMessages();
+}
+
+/* MESSAGE UI */
+function openImageModal(src){
+    modalImage.src=src;
+    imageModal.style.display="flex";
+}
+
+function addMessage(msg,isUser){
+    const c=document.createElement("div");
+    c.className="message-container"+(isUser?" user":"");
+
+    const pw=document.createElement("div");
+    pw.className="profile-wrapper";
+    pw.onclick=()=>openImageModal(msg.senderProfile);
+
+    const img=document.createElement("img");
+    img.src=msg.senderProfile;
+    img.className="profile";
+
+    const dot=document.createElement("span");
+    dot.className="status-dot "+(msg.isOnline?"status-online":"status-offline");
+
+    pw.append(img,dot);
+
+    const m=document.createElement("div");
+    m.className="message "+(isUser?"user":"other");
+
+    if(msg.type==="text")m.textContent=msg.content;
+    if(msg.type==="image"){
+        const i=document.createElement("img");
+        i.src=msg.content;i.onclick=()=>openImageModal(msg.content);
+        m.appendChild(i);
+    }
+    if(msg.type==="voice"){
+        const a=document.createElement("audio");
+        a.controls=true;a.src=msg.content;
+        m.appendChild(a);
+    }
+
+    const t=document.createElement("div");
+    t.className="timestamp";
+    t.textContent=new Date(msg.timestamp).toLocaleTimeString();
+
+    const s=document.createElement("div");
+    s.className="status";
+    s.textContent=isUser?(msg.status||"✓"):"";
+
+    m.append(t,s);
+    c.append(pw,m);
+    contentArea.appendChild(c);
+    contentArea.scrollTop=contentArea.scrollHeight;
+
+    if(!isUser && msg._id) socket.emit("messageRead",{_id:msg._id});
+}
+
+/* LOAD */
+async function loadMessages(){
+    const res=await fetch(`${BASE_URI}/messages`);
+    (await res.json()).forEach(m=>addMessage(m,m.senderName===currentUser.name));
+}
+
+/* SEND TEXT */
+sendBtn.onclick=async()=>{
+    const text=messageInput.value.trim();
+    if(!text)return;
+    const msg={...currentUser,type:"text",content:text,timestamp:new Date(),status:"sending"};
+    addMessage(msg,true);
+    messageInput.value="";
+    const r=await fetch(`${BASE_URI}/saveMessageURI`,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(msg)});
+    socket.emit("messageSent",await r.json());
+};
+
+/* FILE */
+function openFilePicker(){fileInput.click()}
+fileInput.onchange=async()=>{
+    for(const f of fileInput.files){
+        const msg={...currentUser,type:"image",content:await toBase64(f),timestamp:new Date()};
+        addMessage(msg,true);
+        await fetch(`${BASE_URI}/saveMessageURI`,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(msg)});
+        setTimeout(()=>contentArea.lastChild.remove(),800);
+    }
+}
+
+/* VOICE */
+async function startRecording(){
+    const s=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(s);
+    audioChunks=[];
+    mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
+    mediaRecorder.onstop=async()=>{
+        const blob=new Blob(audioChunks);
+        const msg={...currentUser,type:"voice",content:await toBase64(blob),timestamp:new Date()};
+        addMessage(msg,true);
+        await fetch(`${BASE_URI}/saveMessageURI`,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(msg)});
+    }
+    mediaRecorder.start();
+}
+function stopRecording(){mediaRecorder.stop()}
+
+/* TYPING */
+messageInput.oninput=()=>{
+    socket.emit("typing",currentUser.name);
+    clearTimeout(typingTimer);
+    typingTimer=setTimeout(()=>socket.emit("stopTyping"),1000);
+}
+
+/* SOCKET EVENTS */
+socket.on("newMessage",m=>addMessage(m,m.senderName===currentUser.name));
+socket.on("typing",n=>typingStatus.textContent=n+" is typing...");
+socket.on("stopTyping",()=>typingStatus.textContent="");
+socket.on("onlineUsers",u=>onlineCount.textContent=u.length+" Online");
+socket.on("messageRead",d=>{
+    document.querySelectorAll(".status").forEach(s=>s.textContent="✓✓ read");
+});
+</script>
+</body>
+</html>
